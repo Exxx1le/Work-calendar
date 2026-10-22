@@ -1,11 +1,11 @@
 name = "work-calendar"
+main = "./index.js" # Указываем корневой файл воркера
 compatibility_date = "2026-10-19"
 
 [assets]
 directory = "./"
 
-# Привязка базы данных D1
 [[d1_databases]]
-binding = "DB" # Имя, по которому вы будете обращаться к базе в коде (например, env.DB)
+binding = "DB"
 database_name = "vacation-calendar"
 database_id = "ae825217-ac28-4fb2-ba15-7d9bf70e0b1f"
