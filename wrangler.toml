@@ -3,7 +3,7 @@ main = "./index.js" # Указываем корневой файл воркер�
 compatibility_date = "2026-10-19"
 
 [assets]
-directory = "./"
+directory = "./public"
 
 [[d1_databases]]
 binding = "DB"
