@@ -1,34 +1,69 @@
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
-    // 1. Получить состояние календаря (например, GET /api/state)
-    if (url.pathname === "/api/state" && request.method === "GET") {
+    if (url.pathname === "/api/data") {
       try {
-        const { results } = await env.DB.prepare("SELECT * FROM calendar_state WHERE id = 1").all();
-        return Response.json(results[0] || {});
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+        if (request.method === "GET") {
+          const row = await env.DB
+            .prepare("SELECT payload FROM calendar_state WHERE id = 1")
+            .first();
+
+          const data = row
+            ? JSON.parse(row.payload)
+            : { users: {}, currentUserName: "" };
+
+          return Response.json(data, {
+            headers: { "Cache-Control": "no-store" }
+          });
+        }
+
+        if (request.method === "PUT") {
+          const body = await request.json();
+
+          if (
+            !body ||
+            typeof body.users !== "object" ||
+            body.users === null ||
+            Array.isArray(body.users)
+          ) {
+            return Response.json(
+              { error: "Неверный формат данных календаря." },
+              { status: 400 }
+            );
+          }
+
+          const payload = JSON.stringify({
+            users: body.users,
+            currentUserName:
+              typeof body.currentUserName === "string"
+                ? body.currentUserName
+                : ""
+          });
+
+          await env.DB.prepare(`
+            INSERT INTO calendar_state (id, payload, updated_at)
+            VALUES (1, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+              payload = excluded.payload,
+              updated_at = CURRENT_TIMESTAMP
+          `).bind(payload).run();
+
+          return Response.json({ ok: true });
+        }
+
+        return new Response("Method Not Allowed", {
+          status: 405,
+          headers: { Allow: "GET, PUT" }
+        });
+      } catch (error) {
+        return Response.json(
+          { error: "Ошибка API: " + error.message },
+          { status: 500 }
+        );
       }
     }
 
-    // 2. Обновить состояние календаря (например, POST /api/state)
-    if (url.pathname === "/api/state" && request.method === "POST") {
-      try {
-        const body = await request.json();
-        const payloadString = JSON.stringify(body);
-        
-        await env.DB.prepare(
-          "UPDATE calendar_state SET payload = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-        ).bind(payloadString).run();
-
-        return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json" } });
-      }
-    }
-
-    // Все остальные запросы отдают статические файлы вашего сайта из корня репозитория
     return env.ASSETS.fetch(request);
-  },
+  }
 };
